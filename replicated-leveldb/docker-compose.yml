@@ -1,0 +1,99 @@
+version: '3.0'
+
+services:
+
+  influxsrv:
+    image: tutum/influxdb
+    ports:
+      - "8083:8083"
+      - "8086:8086"
+    expose:
+      - "8090"
+      - "8099"
+    environment:
+      - PRE_CREATE_DB=cadvisor
+
+  cadvisor:
+    image: google/cadvisor
+    command: -storage_driver=influxdb -storage_driver_db=cadvisor -storage_driver_host=influxsrv:8086
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+
+  grafana:
+    image: grafana/grafana
+    ports:
+      - "3000:3000"
+    environment:
+      - INFLUXDB_HOST=influxsrv
+      - INFLUXDB_PORT=8086
+      - INFLUXDB_NAME=cadvisor
+      - INFLUXDB_USER=root
+      - INFLUXDB_PASS=root
+
+  zookeeper1:
+    image: mattjtodd/zookeeper:3.4.8
+    ports:
+      - "2181:2181"
+    command: -id 1 -p server.1=zookeeper1:2888:3888 -p server.2=zookeeper2:2888:3888 -p server.3=zookeeper3:2888:3888 -p initLimit=3 -p syncLimit=2
+
+  zookeeper2:
+    image: mattjtodd/zookeeper:3.4.8
+    ports:
+      - "2281:2181"
+    command: -id 2 -p server.1=zookeeper1:2888:3888 -p server.2=zookeeper2:2888:3888 -p server.3=zookeeper3:2888:3888 -p initLimit=3 -p syncLimit=2
+
+  zookeeper3:
+    image: mattjtodd/zookeeper:3.4.8
+    ports:
+      - "2381:2181"
+    command: -id 3 -p server.1=zookeeper1:2888:3888 -p server.2=zookeeper2:2888:3888 -p server.3=zookeeper3:2888:3888 -p initLimit=3 -p syncLimit=2
+
+  activemq1:
+    image: mattjtodd/activemq-clustered:5.14.3
+    build: activemq
+    environment:
+      - QUORUM_SYNC=quorum_disk
+    ports: 
+      - "8161:8161"
+      - "1883"
+      - "5672"
+      - "8161"
+      - "61613" 
+      - "61614"
+      - "61616:61616"
+    command: console -Dactivemq.replicatedLevelDB.replicas=3 -Dactivemq.replicatedLevelDB.zkAddress=zookeeper1,zookeeper2,zookeeper3 -Dactivemq.replicatedLevelDB.sync=$${QUORUM_SYNC} xbean:file:./conf/activemq-clustered.xml
+
+  activemq2:
+    image: mattjtodd/activemq-clustered:5.14.3
+    build: activemq
+    environment:
+      - QUORUM_SYNC=quorum_disk
+    ports:
+      - "8261:8161"
+      - "1883"
+      - "5672"
+      - "8161"
+      - "61613"
+      - "61614"
+      - "62616:61616"
+    command: console -Dactivemq.replicatedLevelDB.replicas=3 -Dactivemq.replicatedLevelDB.zkAddress=zookeeper1,zookeeper2,zookeeper3 -Dactivemq.replicatedLevelDB.sync=$${QUORUM_SYNC} xbean:file:./conf/activemq-clustered.xml
+
+  activemq3:
+    image: mattjtodd/activemq-clustered:5.14.3
+    build: activemq
+    environment:
+      - QUORUM_SYNC=quorum_disk
+    ports:
+      - "8361:8161"
+      - "1883"
+      - "5672"
+      - "8161"
+      - "61613"
+      - "61614"
+      - "63616:61616"
+    command: console -Dactivemq.replicatedLevelDB.replicas=3 -Dactivemq.replicatedLevelDB.zkAddress=zookeeper1,zookeeper2,zookeeper3 -Dactivemq.replicatedLevelDB.sync=$${QUORUM_SYNC} xbean:file:./conf/activemq-clustered.xml
